@@ -4,9 +4,9 @@
 #include <vector>
 #include <algorithm>
 #include <sstream>
+#include <limits>  // เพิ่มบรรทัดนี้
 using namespace std;
 
-// ฟังก์ชันสร้างสำรับไพ่ Q, K, A, J
 vector<char> createDeck() {
     vector<char> deck;
     for (int i = 0; i < 6; i++) {
@@ -20,25 +20,22 @@ vector<char> createDeck() {
     return deck;
 }
 
-// ฟังก์ชันตรวจสอบจำนวนผู้เล่นที่ยังรอด
 int countSurvivors(const vector<bool>& alive) {
     int count = 0;
-    for (bool status : alive) {
-        if (status) count++;
+    for (size_t i = 0; i < alive.size(); ++i) {
+        if (alive[i]) count++;
     }
     return count;
 }
 
-// ฟังก์ชันแสดงมือไพ่ของผู้เล่น
 void displayHand(const vector<char>& hand) {
-    for (char c : hand) {
-        cout << c << " ";
+    for (size_t i = 0; i < hand.size(); ++i) {
+        cout << hand[i] << " ";
     }
     cout << endl;
 }
 
-// ฟังก์ชันแจกไพ่ใหม่
-void dealNewHands(vector<vector<char>>& hands, vector<char>& deck, int numPlayers) {
+void dealNewHands(vector<vector<char> >& hands, vector<char>& deck, int numPlayers) {
     int deckIndex = 0;
     hands.clear();
     hands.resize(numPlayers);
@@ -72,13 +69,15 @@ int main() {
     int currentPlayer = 0;
     bool gameRunning = true;
     vector<bool> alive(numPlayers, true);
-    vector<char> tableCards = {'Q', 'K', 'A'};
+    vector<char> tableCards;
+    tableCards.push_back('Q');
+    tableCards.push_back('K');
+    tableCards.push_back('A');
 
     vector<char> discardedCards;
     int roundCount = 1;
-    int bulletChance = 0;  // ตัวนับการหมุน Russian Roulette
 
-    vector<vector<char>> hands(numPlayers);
+    vector<vector<char> > hands(numPlayers);
     vector<char> deck = createDeck();
 
     while (gameRunning) {
@@ -93,6 +92,7 @@ int main() {
             break;
         }
 
+        // ข้ามผู้เล่นที่ถูกกำจัดไปยังผู้เล่นคนถัดไป
         while (!alive[currentPlayer]) {
             currentPlayer = (currentPlayer + 1) % numPlayers;
         }
@@ -111,7 +111,11 @@ int main() {
         int numCards;
         do {
             cout << "How many cards will you play (1-3)? ";
-            cin >> numCards;
+            while (!(cin >> numCards) || numCards < 1 || numCards > 3) {
+                cout << "Invalid input! Please enter a number between 1 and 3: ";
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            }
         } while (numCards < 1 || numCards > 3);
 
         vector<char> playedCards;
@@ -129,8 +133,8 @@ int main() {
         }
 
         bool valid = true;
-        for (char card : inputCards) {
-            if (find(hands[currentPlayer].begin(), hands[currentPlayer].end(), card) == hands[currentPlayer].end()) {
+        for (size_t i = 0; i < inputCards.size(); ++i) {
+            if (find(hands[currentPlayer].begin(), hands[currentPlayer].end(), inputCards[i]) == hands[currentPlayer].end()) {
                 valid = false;
                 break;
             }
@@ -146,30 +150,37 @@ int main() {
             }
 
             valid = true;
-            for (char card : inputCards) {
-                if (find(hands[currentPlayer].begin(), hands[currentPlayer].end(), card) == hands[currentPlayer].end()) {
+            for (size_t i = 0; i < inputCards.size(); ++i) {
+                if (find(hands[currentPlayer].begin(), hands[currentPlayer].end(), inputCards[i]) == hands[currentPlayer].end()) {
                     valid = false;
                     break;
                 }
             }
         }
 
-        for (char card : inputCards) {
-            hands[currentPlayer].erase(find(hands[currentPlayer].begin(), hands[currentPlayer].end(), card));
-            discardedCards.push_back(card);
+        for (size_t i = 0; i < inputCards.size(); ++i) {
+            hands[currentPlayer].erase(find(hands[currentPlayer].begin(), hands[currentPlayer].end(), inputCards[i]));
+            discardedCards.push_back(inputCards[i]);
         }
 
         int nextPlayer = (currentPlayer + 1) % numPlayers;
+        
+        // ข้ามผู้เล่นที่ถูกกำจัด
+        while (!alive[nextPlayer]) {
+            nextPlayer = (nextPlayer + 1) % numPlayers;
+        }
+
         cout << players[nextPlayer] << ", do you challenge " << players[currentPlayer] << "'s play? (X to challenge, any key to continue): ";
         char challenge;
         cin >> challenge;
+        cin.ignore();
 
         if (challenge == 'X' || challenge == 'x') {
             cout << players[nextPlayer] << " is challenging " << players[currentPlayer] << "'s play!" << endl;
 
             bool lying = false;
-            for (char c : inputCards) {
-                if (c != tableCard && c != 'J') {
+            for (size_t i = 0; i < inputCards.size(); ++i) {
+                if (inputCards[i] != tableCard && inputCards[i] != 'J') {
                     lying = true;
                     break;
                 }
@@ -178,14 +189,18 @@ int main() {
             int victimIndex = lying ? currentPlayer : nextPlayer;
             cout << players[victimIndex] << " must take a bullet!" << endl;
 
-            bulletChance = (bulletChance % 6) + 1;  // เพิ่มโอกาสหมุน Russian Roulette
+            // Russian Roulette: โอกาสการยิงจะเพิ่มขึ้นตามจำนวนรอบที่ท้าทาย
+            int russianRoulette = rand() % 6 + 1;  // สุ่มระหว่าง 1 ถึง 6
+            int chanceToShoot = roundCount;  // คำนวณความเสี่ยงจากรอบที่ท้าทาย
 
-            if (rand() % 6 == 0) {
+            // แสดงความเสี่ยงก่อนการยิง
+            cout << players[victimIndex] << " faces a " << chanceToShoot << "/6 chance to be shot!" << endl;
+
+            if (russianRoulette <= chanceToShoot) {
                 cout << "BANG! " << players[victimIndex] << " is eliminated!" << endl;
                 alive[victimIndex] = false;
-                bulletChance = 0;  // รีเซ็ตโอกาสหลังมีคนตาย
             } else {
-                cout << "CLICK! No bullet. " << players[victimIndex] << " (" << bulletChance << "/6) survives." << endl;
+                cout << "CLICK! No bullet. " << players[victimIndex] << " survives." << endl;
             }
 
             if (countSurvivors(alive) == 1) {
@@ -198,6 +213,21 @@ int main() {
                 }
                 break;
             }
+
+            roundCount++;  // เพิ่มจำนวนรอบหลังจากการท้าทาย
+        } else {
+            bool allHandsEmpty = true;
+            for (int i = 0; i < numPlayers; ++i) {
+                if (!hands[i].empty()) {
+                    allHandsEmpty = false;
+                    break;
+                }
+            }
+
+            if (allHandsEmpty) {
+                cout << "All players have run out of cards! The game continues to the next round." << endl;
+                roundCount++;
+            }
         }
 
         deck.insert(deck.end(), discardedCards.begin(), discardedCards.end());
@@ -205,7 +235,6 @@ int main() {
         discardedCards.clear();
 
         currentPlayer = (currentPlayer + 1) % numPlayers;
-        roundCount++;
     }
 
     cout << "Game over! Thanks for playing Liar's Bar." << endl;
