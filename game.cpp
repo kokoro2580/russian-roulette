@@ -13,11 +13,12 @@ int countSurvivors(const vector<bool>& alive);
 void displayHand(const vector<char>& hand);
 void dealNewHands(vector<vector<char>>& hands, vector<char>& deck, int numPlayers);
 void gameLoop(vector<string>& players, int numPlayers);
-void playTurn(int currentPlayer, vector<vector<char>>& hands, vector<char>& deck, vector<string>& players, vector<bool>& alive, vector<char>& tableCards, vector<char>& discardedCards, int& roundCount, bool& changeRound, vector<int>& shootCount);
-bool challengePlayer(int currentPlayer, int nextPlayer, vector<char>& tableCards, vector<vector<char>>& hands, vector<string>& players, vector<bool>& alive, vector<char>& discardedCards, int& roundCount, vector<int>& shootCount);
-void processChallenge(bool lying, int currentPlayer, int nextPlayer, vector<string>& players, vector<bool>& alive, int& roundCount, vector<int>& shootCount);
+void playTurn(int currentPlayer, vector<vector<char>>& hands, vector<char>& deck, vector<string>& players, vector<bool>& alive, vector<char>& tableCards, vector<char>& discardedCards, int& roundCount, bool& changeRound, vector<int>& shootCount,int numPlayers,char tableCard);
+bool challengePlayer(int currentPlayer, int nextPlayer, vector<char>& tableCards, vector<vector<char>>& hands, vector<string>& players, vector<bool>& alive, vector<char>& discardedCards, int& roundCount, vector<int>& shootCount,char tableCard);
+void processChallenge(bool lying, int currentPlayer, int nextPlayer, vector<string>& players, vector<bool>& alive, int& roundCount, vector<int>& shootCount,char tableCard);
 bool checkIfAllHandsEmpty(const vector<vector<char>>& hands);
 void reshuffleDeck(vector<char>& deck, vector<char>& discardedCards);
+bool checkIfHandEmpty(const vector<vector<char>>& hands,int currentPlayer);
 
 int main() {
     srand(time(0));
@@ -55,11 +56,10 @@ void gameLoop(vector<string>& players, int numPlayers) {
     vector<vector<char>> hands(numPlayers);
     vector<char> deck = createDeck();
     vector<int> shootCount(numPlayers, 0);  // เก็บจำนวนการยิงของผู้เล่นแต่ละคน
-
     cout << "\n=== Round " << roundCount << " ===" << endl;
     char tableCard = tableCards[rand() % tableCards.size()];
     cout << "The table card is set. Players must claim to play: " << tableCard << endl;
-
+        dealNewHands(hands, deck, players.size());
     while (gameRunning) {
         if (countSurvivors(alive) == 1) {
             for (int i = 0; i < numPlayers; ++i) {
@@ -77,7 +77,8 @@ void gameLoop(vector<string>& players, int numPlayers) {
             currentPlayer = (currentPlayer + 1) % numPlayers;
         }
 
-        playTurn(currentPlayer, hands, deck, players, alive, tableCards, discardedCards, roundCount, changeRound, shootCount);
+
+        playTurn(currentPlayer, hands, deck, players, alive, tableCards, discardedCards, roundCount, changeRound, shootCount,numPlayers,tableCard);
 
         reshuffleDeck(deck, discardedCards);
 
@@ -106,11 +107,13 @@ void gameLoop(vector<string>& players, int numPlayers) {
     }
 }
 
-void playTurn(int currentPlayer, vector<vector<char>>& hands, vector<char>& deck, vector<string>& players, vector<bool>& alive, vector<char>& tableCards, vector<char>& discardedCards, int& roundCount, bool& changeRound, vector<int>& shootCount) {
-    if (hands[currentPlayer].empty()) {
-        dealNewHands(hands, deck, players.size());
+void playTurn(int currentPlayer, vector<vector<char>>& hands, vector<char>& deck, vector<string>& players, vector<bool>& alive, vector<char>& tableCards, vector<char>& discardedCards, int& roundCount, bool& changeRound, vector<int>& shootCount,int numPlayers,char tableCard) {
+    //if (hands[currentPlayer].empty()) {dealNewHands(hands, deck, players.size());}
+    
+    if (checkIfHandEmpty(hands , currentPlayer)){
+        currentPlayer = (currentPlayer + 1) % numPlayers;
     }
-
+    
     string player = players[currentPlayer];
     cout << "\n" << player << "'s turn!" << endl;
     cout << "Your hand: ";
@@ -179,28 +182,29 @@ void playTurn(int currentPlayer, vector<vector<char>>& hands, vector<char>& deck
     cin.ignore();
 
     if (challenge == 'X' || challenge == 'x') {
-        if (challengePlayer(currentPlayer, nextPlayer, tableCards, hands, players, alive, discardedCards, roundCount, shootCount)) {
+        if (challengePlayer(currentPlayer, nextPlayer, tableCards, hands, players, alive, discardedCards, roundCount, shootCount,tableCard)) {
             changeRound = true;
         }
     }
 }
 
-bool challengePlayer(int currentPlayer, int nextPlayer, vector<char>& tableCards, vector<vector<char>>& hands, vector<string>& players, vector<bool>& alive, vector<char>& discardedCards, int& roundCount, vector<int>& shootCount) {
+bool challengePlayer(int currentPlayer, int nextPlayer, vector<char>& tableCards, vector<vector<char>>& hands, vector<string>& players, vector<bool>& alive, vector<char>& discardedCards, int& roundCount, vector<int>& shootCount,char tableCard) {
     cout << players[nextPlayer] << " is challenging " << players[currentPlayer] << "'s play!" << endl;
 
     bool lying = false;
     for (char card : discardedCards) {
-        if (card != tableCards[rand() % tableCards.size()] && card != 'J') {
+        if (card != tableCard && card != 'J') {
             lying = true;
             break;
         }
     }
+	
 
-    processChallenge(lying, currentPlayer, nextPlayer, players, alive, roundCount, shootCount);
+    processChallenge(lying, currentPlayer, nextPlayer, players, alive, roundCount, shootCount,tableCard);
     return lying;
 }
 
-void processChallenge(bool lying, int currentPlayer, int nextPlayer, vector<string>& players, vector<bool>& alive, int& roundCount, vector<int>& shootCount) {
+void processChallenge(bool lying, int currentPlayer, int nextPlayer, vector<string>& players, vector<bool>& alive, int& roundCount, vector<int>& shootCount,char tableCard) {
     int victimIndex = lying ? currentPlayer : nextPlayer;
     cout << players[victimIndex] << " must take a bullet!" << endl;
 
@@ -226,6 +230,12 @@ bool checkIfAllHandsEmpty(const vector<vector<char>>& hands) {
         }
     }
     return true;
+}
+bool checkIfHandEmpty(const vector<vector<char>>& hands,int currentPlayer) {
+    if (hands[currentPlayer].empty()) {
+        return true;
+    }
+    return false;
 }
 
 void reshuffleDeck(vector<char>& deck, vector<char>& discardedCards) {
